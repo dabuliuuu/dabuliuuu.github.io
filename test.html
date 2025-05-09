@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>YouTube数据分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.2/dist/echarts.min.js"></script>
+    <style>
+        .chart-container { width: 100%; height: 500px; margin: 20px 0; }
+        .row { display: flex; justify-content: space-between; }
+        .col { width: 49%; }
+    </style>
+</head>
+<body>
+    <div class="row">
+        <div id="videoFeatures1" class="col chart-container"></div>
+        <div id="videoFeatures2" class="col chart-container"></div>
+    </div>
+
+    <div id="weeklyTrend" class="chart-container"></div>
+
+    <div class="row">
+        <div id="weekdayPublish" class="col chart-container"></div>
+        <div id="weekdayLike" class="col chart-container"></div>
+    </div>
+
+    <div id="adPerformance" class="chart-container"></div>
+
+    <script>
+        // 加载数据
+        Promise.all([
+            fetch('video_data.json').then(r => r.json()),
+            fetch('weekly_data.json').then(r => r.json()),
+            fetch('weekday_data.json').then(r => r.json()),
+            fetch('scatter_data.json').then(r => r.json())
+        ]).then(([videoData, weeklyData, weekdayData, scatterData]) => {
+            
+            // 1. 视频特征分析
+            initVideoFeatures(videoData);
+            
+            // 2. 时间序列分析
+            initWeeklyTrend(weeklyData);
+            
+            // 3. 星期分析
+            initWeekdayAnalysis(weekdayData);
+            
+            // 4. 广告表现
+            initAdPerformance(scatterData);
+        });
+
+        function initVideoFeatures(data) {
+            // 视频数量分布
+            const xData = data.map(d => d.duration_group);
+            const barChart = echarts.init(document.getElementById('videoFeatures1'));
+            barChart.setOption({
+                title: { text: '各时长区间视频数量分布', left: 'center' },
+                xAxis: { type: 'category', data: xData },
+                yAxis: { type: 'value' },
+                series: [{
+                    type: 'bar',
+                    data: data.map(d => d.video_count),
+                    itemStyle: { color: '#2c7bb6', opacity: 0.7 }
+                }],
+                grid: { containLabel: true }
+            });
+
+            // 收益表现
+            const lineChart = echarts.init(document.getElementById('videoFeatures2'));
+            lineChart.setOption({
+                title: { text: '不同时长视频收益（每千次播放收益）', left: 'center' },
+                xAxis: { type: 'category', data: xData },
+                yAxis: { type: 'value', name: '美元' },
+                series: [{
+                    type: 'line',
+                    data: data.map(d => d.avg_cpm),
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    lineStyle: { color: '#d7191c', width: 3 },
+                    itemStyle: { color: '#d7191c' }
+                }],
+                grid: { containLabel: true }
+            });
+        }
+
+        function initWeeklyTrend(data) {
+            const chart = echarts.init(document.getElementById('weeklyTrend'));
+            
+            // 转换时间格式
+            const formattedData = data.map(d => [
+                new Date(d.publish_time), // X轴时间
+                d.views                   // Y轴播放量
+            ]);
+
+            chart.setOption({
+                title: { text: '2016-2024年周播放量趋势', left: 'center' },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const date = new Date(params[0].value[0]);
+                        return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}-${date.getDate().toString().padStart(2,'0')}<br/>播放量: ${params[0].value[1].toLocaleString()}`;
+                    }
+                },
+                xAxis: {
+                    type: 'time',
+                    boundaryGap: false,
+                    axisLabel: {
+                        formatter: (value) => {
+                            const date = new Date(value);
+                            return `${date.getFullYear()}-${date.getMonth()+1}`;
+                        }
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '播放量',
+                    axisLabel: {
+                        formatter: (value) => {
+                            if (value >= 1000000) return `${value/1000000}M`;
+                            if (value >= 1000) return `${value/1000}K`;
+                            return value;
+                        }
+                    }
+                },
+                series: [{
+                    type: 'line',
+                    data: formattedData,
+                    smooth: true,
+                    lineStyle: {
+                        color: '#006837',
+                        width: 2
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0,
+                            x2: 0, y2: 1,
+                            colorStops: [{
+                                offset: 0, color: '#00683740'
+                            }, {
+                                offset: 1, color: '#00683700'
+                            }]
+                        }
+                    },
+                    symbol: 'none'
+                }],
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    containLabel: true
+                }
+            });
+        }
+
+        function initWeekdayAnalysis(data) {
+            // 发布日分布
+            const barChart = echarts.init(document.getElementById('weekdayPublish'));
+            barChart.setOption({
+                title: { text: '不同星期发布视频数量', left: 'center' },
+                xAxis: { 
+                    type: 'category', 
+                    data: data.map(d => d.publish_weekday) 
+                },
+                yAxis: { type: 'value' },
+                series: [{
+                    type: 'bar',
+                    data: data.map(d => d.publish_count),
+                    itemStyle: { color: '#5e3c99', opacity: 0.7 }
+                }],
+                grid: { containLabel: true }
+            });
+
+            // 点赞率表现
+           const lineChart = echarts.init(document.getElementById('weekdayLike'));
+            lineChart.setOption({
+                title: { text: '不同星期用户点赞率', left: 'center' },
+                xAxis: { 
+                    type: 'category',
+                    data: data.map(d => d.publish_weekday)
+                },
+                yAxis: { 
+                    type: 'value',
+                    name: '点赞率 (%)',
+                    min: 96.0,  // 设置最小值
+                    max: 100.0, // 设置最大值
+                    axisLabel: {
+                        formatter: function(value) {
+                            return value.toFixed(1); // 显示一位小数
+                        }
+                    }
+                },
+                series: [{
+                    type: 'line',
+                    data: data.map(d => d.avg_like),
+                    symbol: 'diamond',
+                    symbolSize: 8,
+                    lineStyle: { color: '#e66101', width: 2 },
+                    itemStyle: { color: '#e66101' }
+                }],
+                grid: { containLabel: true }
+            });
+        }
+
+       function initAdPerformance(data) {
+    const chart = echarts.init(document.getElementById('adPerformance'));
+    
+    // 生成颜色映射函数（红→黄→绿渐变）
+    const getColor = (rate) => {
+        const hue = ((100 - rate) * 120 / 100).toString(10); // 0(红) → 120(绿)
+        return `hsl(${hue}, 100%, 50%)`;
+    };
+
+    // 重构数据格式
+    const scatterData = data.map(d => ({
+        value: [
+            d.ad_impressions,                     // X轴：广告曝光量
+            d['Revenue per 1000 Views (USD)'],    // Y轴：收益
+            d.views / 100,                        // 气泡大小
+            d.complete_rate                       // 颜色依据值
+        ],
+        itemStyle: {
+            color: getColor(d.complete_rate)      // 直接设置颜色
+        }
+    }));
+
+    chart.setOption({
+        title: { text: '广告曝光量与收益关联性', left: 'center' },
+        xAxis: { type: 'log', name: '广告曝光量（次）' },
+        yAxis: { name: '每千次播放收益（美元）' },
+        visualMap: [{
+            // 气泡大小映射
+            dimension: 2,
+            min: Math.min(...data.map(d => d.views/100)),
+            max: Math.max(...data.map(d => d.views/100)),
+            inRange: { symbolSize: [10, 50] },
+            textStyle: { color: '#666' }
+        }, {
+            // 颜色图例
+            type: 'continuous',
+            dimension: 3,
+            min: 0,
+            max: 100,
+            inRange: { color: ['#ff0000', '#ffff00', '#00ff00'] },
+            orient: 'horizontal',
+            left: 'center',
+            bottom: 0
+        }],
+        series: [{
+            type: 'scatter',
+            data: scatterData,
+            symbolSize: val => val[2],
+            itemStyle: {
+                color: params => params.data.itemStyle.color // 直接使用预计算颜色
+            }
+        }]
+    });
+}
+    </script>
+</body>
+</html>
