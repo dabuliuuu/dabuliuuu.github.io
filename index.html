@@ -1,31 +1,307 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="utf-8">
     <title>YouTube数据分析</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.2/dist/echarts.min.js"></script>
     <style>
-        .chart-container { width: 100%; height: 500px; margin: 20px 0; }
-        .row { display: flex; justify-content: space-between; }
-        .col { width: 49%; }
+        /* 全局样式 */
+        :root {
+            --primary-color: #2c7bb6;
+            --secondary-color: #00a6ca;
+            --accent-color: #f57c00;
+            --bg-color: #0d1117;
+            --text-color: #e6e6e6;
+            --card-bg: #161c22;
+            --shadow: rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* 新增：科技感背景动画 */
+        .background-wrap {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        canvas#bgCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .dashboard-container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        h1.dashboard-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(44, 123, 182, 0.3);
+        }
+
+        .chart-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-col {
+            flex: 1 1 calc(50% - 1rem);
+            min-width: 400px;
+            display: flex;
+        }
+
+        .chart-card {
+            background-color: rgba(22, 28, 34, 0.6);
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+            height: 600px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+        }
+
+        .chart-container {
+            width: 100%;
+            flex-grow: 1;
+            min-height: 450px;
+            position: relative;
+        }
+
+        .chart-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 100%;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            opacity: 0.4;
+            transition: opacity 0.3s ease;
+        }
+
+        .chart-card:hover .chart-container::after {
+            opacity: 1;
+        }
+
+        @media (max-width: 992px) {
+            .chart-col {
+                flex: 1 1 100%;
+                min-width: 100%;
+            }
+            
+            .chart-card {
+                height: 500px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            h1.dashboard-title {
+                font-size: 2rem;
+            }
+            
+            .chart-card {
+                padding: 1.5rem;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="row">
-        <div id="videoFeatures1" class="col chart-container"></div>
-        <div id="videoFeatures2" class="col chart-container"></div>
+    <!-- 动态背景 -->
+    <div class="background-wrap">
+        <canvas id="bgCanvas"></canvas>
+        <script>
+            window.addEventListener('load', () => {
+                const canvas = document.getElementById('bgCanvas');
+                const ctx = canvas.getContext('2d');
+                let width, height;
+
+                function resizeCanvas() {
+                    width = canvas.width = window.innerWidth;
+                    height = canvas.height = window.innerHeight;
+                }
+
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                // 创建粒子系统
+                const particles = [];
+                const particleCount = 100;
+
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push({
+                        x: Math.random() * width,
+                        y: Math.random() * height,
+                        vx: (Math.random() - 0.5) * 0.5,
+                        vy: (Math.random() - 0.5) * 0.5,
+                        radius: Math.random() * 2 + 1,
+                        alpha: Math.random()
+                    });
+                }
+
+                function drawParticles() {
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.fillStyle = 'rgba(44, 123, 182, 0.6)';
+                    for (let p of particles) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // 更新位置
+                        p.x += p.vx;
+                        p.y += p.vy;
+
+                        // 边界反弹
+                        if (p.x <= 0 || p.x >= width) p.vx *= -1;
+                        if (p.y <= 0 || p.y >= height) p.vy *= -1;
+                    }
+                }
+
+                // 计算连接线
+                function connectParticles() {
+                    for (let i = 0; i < particleCount; i++) {
+                        for (let j = i + 1; j < particleCount; j++) {
+                            const dx = particles[i].x - particles[j].x;
+                            const dy = particles[i].y - particles[j].y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < 120) {
+                                ctx.strokeStyle = `rgba(44, 123, 182, ${1 - dist / 120})`;
+                                ctx.lineWidth = 0.8;
+                                ctx.beginPath();
+                                ctx.moveTo(particles[i].x, particles[i].y);
+                                ctx.lineTo(particles[j].x, particles[j].y);
+                                ctx.stroke();
+                            }
+                        }
+                    }
+                }
+
+                function animateBackground() {
+                    drawParticles();
+                    connectParticles();
+                    requestAnimationFrame(animateBackground);
+                }
+
+                animateBackground();
+            });
+        </script>
     </div>
 
-    <div id="weeklyTrend" class="chart-container"></div>
+    <div class="dashboard-container">
+        <h1 class="dashboard-title">YouTube视频数据分析</h1>
+        
+        <div class="chart-row">
+            <div class="chart-col">
+                <div class="chart-card">
+                    <div id="videoFeatures1" class="chart-container"></div>
+                </div>
+            </div>
+            <div class="chart-col">
+                <div class="chart-card">
+                    <div id="videoFeatures2" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
 
-    <div class="row">
-        <div id="weekdayPublish" class="col chart-container"></div>
-        <div id="weekdayLike" class="col chart-container"></div>
+        <div class="chart-row">
+            <div class="chart-col">
+                <div class="chart-card">
+                    <div id="weeklyTrend" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-col">
+                <div class="chart-card">
+                    <div id="weekdayPublish" class="chart-container"></div>
+                </div>
+            </div>
+            <div class="chart-col">
+                <div class="chart-card">
+                    <div id="weekdayLike" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-col">
+                <div class="chart-card">
+                    <div id="adPerformance" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div id="adPerformance" class="chart-container"></div>
+    <script type="module">
+        // 主题配置
+        const themeConfig = {
+            colors: ['#2c7bb6', '#00a6ca', '#f57c00', '#d7191c', '#aabccc', '#5e3c99'],
+            axisLine: { lineStyle: { color: '#888' } },
+            splitLine: { lineStyle: { color: '#333' } },
+            label: { color: '#bbb' },
+            titleColor: '#eee',
+            legend: {
+                textStyle: { color: '#bbb' }
+            }
+        };
 
-    <script>
+        // 注册自定义主题
+        echarts.registerTheme('customTheme', {
+            color: themeConfig.colors,
+            backgroundColor: 'transparent',
+            axisPointer: {
+                lineStyle: {
+                    color: themeConfig.axisLine.lineStyle.color
+                }
+            },
+            splitLine: {
+                lineStyle: {
+                    color: themeConfig.splitLine.lineStyle.color
+                }
+            },
+            axisLabel: {
+                color: themeConfig.label.color
+            },
+            title: {
+                textStyle: {
+                    color: themeConfig.titleColor
+                }
+            },
+            legend: {
+                textStyle: {
+                    color: themeConfig.legend.textStyle.color
+                }
+            }
+        });
+
         // 加载数据
         Promise.all([
             fetch('video_data.json').then(r => r.json()),
@@ -50,39 +326,173 @@
         function initVideoFeatures(data) {
             // 视频数量分布
             const xData = data.map(d => d.duration_group);
-            const barChart = echarts.init(document.getElementById('videoFeatures1'));
+            
+            // 创建柱状图
+            const barChart = echarts.init(document.getElementById('videoFeatures1'), 'customTheme');
+            
+            // 动态计算最大值
+            const maxCount = Math.max(...data.map(d => d.video_count));
+            
+            // 创建渐变色背景
+            const barBackground = {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                    { offset: 0, color: themeConfig.colors[0] + '66' },
+                    { offset: 1, color: themeConfig.colors[0] + '00' }
+                ]
+            };
+            
             barChart.setOption({
-                title: { text: '各时长区间视频数量分布', left: 'center' },
-                xAxis: { type: 'category', data: xData },
-                yAxis: { type: 'value' },
+                title: { 
+                    text: '各时长区间视频数量分布',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderColor: themeConfig.colors[0],
+                    textStyle: {
+                        color: '#333'
+                    },
+                    formatter: function(params) {
+                        return `${params[0].name}<br/>视频数量: ${params[0].value.toLocaleString()}个`;
+                    }
+                },
+                xAxis: { 
+                    type: 'category',
+                    data: xData,
+                    axisLabel: {
+                        rotate: 45
+                    }
+                },
+                yAxis: { 
+                    type: 'value',
+                    name: '视频数量',
+                    axisLabel: {
+                        formatter: function(value) {
+                            if (value >= 1000000) return `${value/1000000}M`;
+                            if (value >= 1000) return `${value/1000}K`;
+                            return value;
+                        }
+                    }
+                },
                 series: [{
+                    name: '视频数量',
                     type: 'bar',
                     data: data.map(d => d.video_count),
-                    itemStyle: { color: '#2c7bb6', opacity: 0.7 }
+                    itemStyle: {
+                        color: themeConfig.colors[0],
+                        borderRadius: [4, 4, 0, 0]
+                    },
+                    barWidth: '60%',
+                    showBackground: true,
+                    backgroundStyle: {
+                        color: barBackground
+                    },
                 }],
-                grid: { containLabel: true }
+                grid: {
+                    top: 40,
+                    bottom: 60,
+                    left: 60,
+                    right: 20
+                }
             });
 
             // 收益表现
-            const lineChart = echarts.init(document.getElementById('videoFeatures2'));
+            const lineChart = echarts.init(document.getElementById('videoFeatures2'), 'customTheme');
+            
+            // 计算平均CPM的最高值（用于动画效果）
+            const maxCpm = Math.max(...data.map(d => d.avg_cpm)) * 1.2;
+            
             lineChart.setOption({
-                title: { text: '不同时长视频收益（每千次播放收益）', left: 'center' },
-                xAxis: { type: 'category', data: xData },
-                yAxis: { type: 'value', name: '美元' },
+                title: { 
+                    text: '不同时长视频收益（每千次播放收益）',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderColor: themeConfig.colors[3],
+                    textStyle: {
+                        color: '#333'
+                    },
+                    formatter: function(params) {
+                        return `${params[0].name}<br/>每千次播放收益: $${params[0].value.toFixed(2)}美元`;
+                    }
+                },
+                xAxis: { 
+                    type: 'category',
+                    data: xData,
+                    axisLabel: {
+                        rotate: 45
+                    }
+                },
+                yAxis: { 
+                    type: 'value',
+                    name: '美元',
+                    axisLabel: {
+                        formatter: function(value) {
+                            return `$${value.toFixed(2)}`;
+                        }
+                    }
+                },
                 series: [{
+                    name: '每千次播放收益',
                     type: 'line',
                     data: data.map(d => d.avg_cpm),
+                    smooth: true,
                     symbol: 'circle',
                     symbolSize: 8,
-                    lineStyle: { color: '#d7191c', width: 3 },
-                    itemStyle: { color: '#d7191c' }
+                    lineStyle: {
+                        color: themeConfig.colors[3],
+                        width: 3
+                    },
+                    itemStyle: {
+                        color: themeConfig.colors[3],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [{
+                                offset: 0, color: themeConfig.colors[3] + '66'
+                            }, {
+                                offset: 1, color: themeConfig.colors[3] + '00'
+                            }]
+                        }
+                    }
                 }],
-                grid: { containLabel: true }
+                grid: {
+                    top: 40,
+                    bottom: 60,
+                    left: 60,
+                    right: 20
+                },
+                animationType: 'path',
+                animationDuration: 2000,
+                animationEasing: 'elasticOut'
             });
         }
 
         function initWeeklyTrend(data) {
-            const chart = echarts.init(document.getElementById('weeklyTrend'));
+            const chart = echarts.init(document.getElementById('weeklyTrend'), 'customTheme');
             
             // 转换时间格式
             const formattedData = data.map(d => [
@@ -90,10 +500,27 @@
                 d.views                   // Y轴播放量
             ]);
 
+            // 计算年份范围
+            const years = [...new Set(data.map(d => new Date(d.publish_time).getFullYear()))];
+            const startYear = Math.min(...years);
+            const endYear = Math.max(...years);
+
             chart.setOption({
-                title: { text: '2016-2024年周播放量趋势', left: 'center' },
+                title: { 
+                    text: `${startYear}-${endYear}年周播放量趋势`,
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
                 tooltip: {
                     trigger: 'axis',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderColor: themeConfig.colors[1],
+                    textStyle: {
+                        color: '#333'
+                    },
                     formatter: function(params) {
                         const date = new Date(params[0].value[0]);
                         return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}-${date.getDate().toString().padStart(2,'0')}<br/>播放量: ${params[0].value[1].toLocaleString()}`;
@@ -121,11 +548,12 @@
                     }
                 },
                 series: [{
+                    name: '播放量',
                     type: 'line',
                     data: formattedData,
                     smooth: true,
                     lineStyle: {
-                        color: '#006837',
+                        color: '#00796b',
                         width: 2
                     },
                     areaStyle: {
@@ -134,9 +562,9 @@
                             x: 0, y: 0,
                             x2: 0, y2: 1,
                             colorStops: [{
-                                offset: 0, color: '#00683740'
+                                offset: 0, color: '#00c85399'
                             }, {
-                                offset: 1, color: '#00683700'
+                                offset: 1, color: '#00c85300'
                             }]
                         }
                     },
@@ -146,35 +574,147 @@
                     left: '3%',
                     right: '4%',
                     containLabel: true
-                }
+                },
+                dataZoom: [{
+                    type: 'slider',
+                    start: 0,
+                    end: 100,
+                    height: 12,
+                    fillerColor: themeConfig.colors[1] + '44',
+                    handleStyle: {
+                        color: themeConfig.colors[1]
+                    },
+                    emphasis: {
+                        handleStyle: {
+                            color: themeConfig.colors[1]
+                        }
+                    }
+                }],
+                animationType: 'path',
+                animationDuration: 2000,
+                animationEasing: 'easeOutQuint'
             });
         }
 
         function initWeekdayAnalysis(data) {
             // 发布日分布
-            const barChart = echarts.init(document.getElementById('weekdayPublish'));
+            const barChart = echarts.init(document.getElementById('weekdayPublish'), 'customTheme');
+            
+            // 按星期排序
+            const sortedData = [...data].sort((a, b) => {
+                const order = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+                return order.indexOf(a.publish_weekday) - order.indexOf(b.publish_weekday);
+            });
+            
+            // 计算百分比
+            const total = sortedData.reduce((sum, d) => sum + d.publish_count, 0);
+            
             barChart.setOption({
-                title: { text: '不同星期发布视频数量', left: 'center' },
+                title: { 
+                    text: '不同星期发布视频数量',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderColor: themeConfig.colors[4],
+                    textStyle: {
+                        color: '#333'
+                    },
+                    formatter: function(params) {
+                        const percent = ((params[0].value / total) * 100).toFixed(1);
+                        return `${params[0].name}<br/>视频数量: ${params[0].value.toLocaleString()}个 (${percent}%)`;
+                    }
+                },
                 xAxis: { 
                     type: 'category', 
-                    data: data.map(d => d.publish_weekday) 
+                    data: sortedData.map(d => d.publish_weekday),
+                    axisLabel: {
+                        rotate: 0
+                    }
                 },
-                yAxis: { type: 'value' },
+                yAxis: { 
+                    type: 'value',
+                    name: '视频数量',
+                    axisLabel: {
+                        formatter: function(value) {
+                            if (value >= 1000000) return `${value/1000000}M`;
+                            if (value >= 1000) return `${value/1000}K`;
+                            return value;
+                        }
+                    }
+                },
                 series: [{
+                    name: '视频数量',
                     type: 'bar',
-                    data: data.map(d => d.publish_count),
-                    itemStyle: { color: '#5e3c99', opacity: 0.7 }
+                    data: sortedData.map(d => d.publish_count),
+                    itemStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [{
+                                offset: 0, color: themeConfig.colors[4] + 'dd'
+                            }, {
+                                offset: 1, color: themeConfig.colors[4] + 'aa'
+                            }]
+                        },
+                        borderRadius: [4, 4, 0, 0]
+                    },
+                    barWidth: '60%',
                 }],
-                grid: { containLabel: true }
+                grid: {
+                    top: 40,
+                    bottom: 60,
+                    left: 60,
+                    right: 20
+                },
+                animationType: 'scale',
+                animationDuration: 1500,
+                animationEasing: 'elasticOut'
             });
 
             // 点赞率表现
-           const lineChart = echarts.init(document.getElementById('weekdayLike'));
+            const lineChart = echarts.init(document.getElementById('weekdayLike'), 'customTheme');
+            
+            // 按星期排序
+            const sortedLikeData = [...data].sort((a, b) => {
+                const order = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+                return order.indexOf(a.publish_weekday) - order.indexOf(b.publish_weekday);
+            });
+            
+            // 计算平均点赞率
+            const avgLikeRate = sortedLikeData.reduce((sum, d) => sum + d.avg_like, 0) / sortedLikeData.length;
+
             lineChart.setOption({
-                title: { text: '不同星期用户点赞率', left: 'center' },
+                title: { 
+                    text: '不同星期用户点赞率',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderColor: themeConfig.colors[2],
+                    textStyle: {
+                        color: '#333'
+                    },
+                    formatter: function(params) {
+                        return `${params[0].name}<br/>点赞率: ${params[0].value.toFixed(2)}%`;
+                    }
+                },
                 xAxis: { 
                     type: 'category',
-                    data: data.map(d => d.publish_weekday)
+                    data: sortedLikeData.map(d => d.publish_weekday)
                 },
                 yAxis: { 
                     type: 'value',
@@ -188,71 +728,175 @@
                     }
                 },
                 series: [{
+                    name: '点赞率',
                     type: 'line',
-                    data: data.map(d => d.avg_like),
+                    data: sortedLikeData.map(d => d.avg_like),
+                    smooth: true,
                     symbol: 'diamond',
                     symbolSize: 8,
-                    lineStyle: { color: '#e66101', width: 2 },
-                    itemStyle: { color: '#e66101' }
+                    lineStyle: { 
+                        color: themeConfig.colors[2],
+                        width: 2
+                    },
+                    itemStyle: { 
+                        color: themeConfig.colors[2],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0,
+                            x2: 0, y2: 1,
+                            colorStops: [{
+                                offset: 0, color: themeConfig.colors[2] + '66'
+                            }, {
+                                offset: 1, color: themeConfig.colors[2] + '00'
+                            }]
+                        }
+                    }
                 }],
-                grid: { containLabel: true }
+                grid: {
+                    top: 40,
+                    bottom: 60,
+                    left: 60,
+                    right: 20
+                },
+                
+                animationType: 'path',
+                animationDuration: 2000,
+                animationEasing: 'elasticOut'
             });
         }
 
-       function initAdPerformance(data) {
-    const chart = echarts.init(document.getElementById('adPerformance'));
-    
-    // 生成颜色映射函数（红→黄→绿渐变）
-    const getColor = (rate) => {
-        const hue = ((100 - rate) * 120 / 100).toString(10); // 0(红) → 120(绿)
-        return `hsl(${hue}, 100%, 50%)`;
-    };
+        function initAdPerformance(data) {
+            const chart = echarts.init(document.getElementById('adPerformance'), 'customTheme');
+            
+            // 生成颜色映射函数（红→黄→绿渐变）
+            const getColor = (rate) => {
+                const hue = ((100 - rate) * 120 / 100).toString(10); // 0(红) → 120(绿)
+                return `hsl(${hue}, 100%, 50%)`;
+            };
 
-    // 重构数据格式
-    const scatterData = data.map(d => ({
-        value: [
-            d.ad_impressions,                     // X轴：广告曝光量
-            d['Revenue per 1000 Views (USD)'],    // Y轴：收益
-            d.views / 100,                        // 气泡大小
-            d.complete_rate                       // 颜色依据值
-        ],
-        itemStyle: {
-            color: getColor(d.complete_rate)      // 直接设置颜色
+            // 计算统计值
+            const impressionsMax = Math.max(...data.map(d => d.ad_impressions));
+            const viewsMax = Math.max(...data.map(d => d.views));
+            
+            // 重构数据格式
+            const scatterData = data.map(d => ({
+                value: [
+                    d.ad_impressions,                     // X轴：广告曝光量
+                    d['Revenue per 1000 Views (USD)'],    // Y轴：收益
+                    d.views / 100,                        // 气泡大小
+                    d.complete_rate                       // 颜色依据值
+                ],
+                itemStyle: {
+                    color: getColor(d.complete_rate)      // 直接设置颜色
+                }
+            }));
+
+            chart.setOption({
+                title: { 
+                    text: '广告曝光量与收益关联性',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 18,
+                        fontWeight: 'normal'
+                    }
+                },
+                tooltip: {
+                    trigger: 'item',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderColor: '#999',
+                    textStyle: {
+                        color: '#333'
+                    },
+                    formatter: function(params) {
+                        return `广告曝光量: ${params.data.value[0].toLocaleString()}次<br/>` +
+                               `每千次播放收益: $${params.data.value[1].toFixed(2)}美元<br/>` +
+                               `播放量: ${Math.round(params.data.value[2] * 100)}次<br/>` +
+                               `完播率: ${params.data.value[3].toFixed(1)}%`;
+                    }
+                },
+                xAxis: { 
+                    type: 'log',
+                    name: '广告曝光量（次）',
+                    axisLabel: {
+                        formatter: function(value) {
+                            if (value >= 1000000) return `${value/1000000}M`;
+                            if (value >= 1000) return `${value/1000}K`;
+                            return value;
+                        }
+                    }
+                },
+                yAxis: { 
+                    name: '每千次播放收益（美元）',
+                    axisLabel: {
+                        formatter: function(value) {
+                            return `$${value.toFixed(2)}`;
+                        }
+                    }
+                },
+              visualMap: [{
+                    // 气泡大小映射
+                    dimension: 2,
+                    min: Math.min(...data.map(d => d.views/100)),
+                    max: Math.max(...data.map(d => d.views/100)),
+                    inRange: { 
+                        symbolSize: [10, 50] 
+                    },
+                    calculable: true,
+                    orient: 'vertical',   // 垂直排列
+                    left: 20,
+                    bottom: 280,           // 向上留出空间给第二个图例
+                    text: ['播放量高', '播放量低'],
+                    textStyle: {
+                        color: '#666'
+                    }
+                }, {
+                    // 颜色图例
+                    type: 'continuous',
+                    dimension: 3,
+                    min: 0,
+                    max: 100,
+                    inRange: { 
+                        color: ['#ff0000', '#ffff00', '#00ff00'] 
+                    },
+                    calculable: true,
+                    orient: 'vertical',   // 垂直排列
+                    left: 20,
+                    bottom: 60,           // 更靠近底部
+                    text: ['完播率低', '完播率高'],
+                    textStyle: {
+                        color: '#666'
+                    }
+                }],
+                series: [{
+                    name: '广告数据',
+                    type: 'scatter',
+                    data: scatterData,
+                    symbolSize: val => val[2],
+                    itemStyle: {
+                        color: params => params.data.itemStyle.color
+                    },
+                    emphasis: {
+                        scale: true,
+                        itemStyle: {
+                            borderColor: '#fff',
+                            borderWidth: 2
+                        }
+                    }
+                }],
+                grid: {
+                    left: '8%',
+                    right: '8%',
+                    bottom: '15%'
+                },
+                animationType: 'scale',
+                animationDuration: 1500,
+                animationEasing: 'elasticOut'
+            });
         }
-    }));
-
-    chart.setOption({
-        title: { text: '广告曝光量与收益关联性', left: 'center' },
-        xAxis: { type: 'log', name: '广告曝光量（次）' },
-        yAxis: { name: '每千次播放收益（美元）' },
-        visualMap: [{
-            // 气泡大小映射
-            dimension: 2,
-            min: Math.min(...data.map(d => d.views/100)),
-            max: Math.max(...data.map(d => d.views/100)),
-            inRange: { symbolSize: [10, 50] },
-            textStyle: { color: '#666' }
-        }, {
-            // 颜色图例
-            type: 'continuous',
-            dimension: 3,
-            min: 0,
-            max: 100,
-            inRange: { color: ['#ff0000', '#ffff00', '#00ff00'] },
-            orient: 'horizontal',
-            left: 'center',
-            bottom: 0
-        }],
-        series: [{
-            type: 'scatter',
-            data: scatterData,
-            symbolSize: val => val[2],
-            itemStyle: {
-                color: params => params.data.itemStyle.color // 直接使用预计算颜色
-            }
-        }]
-    });
-}
     </script>
 </body>
 </html>
